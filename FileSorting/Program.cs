@@ -8,7 +8,7 @@ namespace FileSorting
         {
             try
             {
-                OscillatedSorter.Sort(GetFileName(args));
+                BalancedMerging.Sort(GetFileName(args));
             }
             catch (Exception exception)
             {

@@ -1,5 +1,4 @@
-using static FileSorting.Utils.ByteUtils;
-
+using System.Text;
 namespace FileSorting.Utils
 {
     public static class FileUtils
@@ -10,26 +9,18 @@ namespace FileSorting.Utils
         /// <param name="path">Путь к файлу.</param>
         /// <param name="n">Количество чисел.</param>
         /// <returns>Список из n чисел, считанных с начала файла.</returns>
-        public static List<int> ReadFirstNumbersFromFile(string path, int n)
+        public static List<int> ReadNextNumbers(this FileStream fileStream, int n)
         {
-            if (n <= 0)
-            {
-                return new List<int>();
-            }
-
             List<int> numbers = new List<int>(n);
-            using (FileStream fstream = new FileStream(path, FileMode.Open))
+            while (numbers.Count < n &&
+                fileStream.TryReadNextNumber(out int number))
             {
-                while (numbers.Count < n &&
-                      fstream.TryReadNextNumber(out int number))
-                {
-                    numbers.Add(number);
-                }
+                numbers.Add(number);
             }
 
             return numbers;
         }
-        public static bool TryReadNextNumber(this FileStream fstream, out int number)
+        public static bool TryReadNextNumber(this FileStream fileStream, out int number)
         {
             number = 0;
             bool negative = false;
@@ -38,7 +29,7 @@ namespace FileSorting.Utils
             bool endOfNumber = false;
             do
             {
-                int nextByte = fstream.ReadByte();
+                int nextByte = fileStream.ReadByte();
                 if (nextByte < 0) // достигнут конец потока
                 {
                     endOfNumber = true;
@@ -89,11 +80,11 @@ namespace FileSorting.Utils
             }
 
             List<int> numbers = new List<int>(n);
-            using (FileStream fstream = new FileStream(path, FileMode.Open))
+            using (FileStream fileStream = new FileStream(path, FileMode.Open))
             {
-                fstream.Seek(0, SeekOrigin.End);
+                fileStream.Seek(0, SeekOrigin.End);
                 while (numbers.Count < n &&
-                      fstream.TryReadPreviousNumber(out int number))
+                      fileStream.TryReadPreviousNumber(out int number))
                 {
                     numbers.Add(number);
                 }
@@ -102,7 +93,7 @@ namespace FileSorting.Utils
             return numbers;
         }
 
-        public static bool TryReadPreviousNumber(this FileStream fstream, out int number)
+        public static bool TryReadPreviousNumber(this FileStream fileStream, out int number)
         {
             number = 0;
 
@@ -110,15 +101,15 @@ namespace FileSorting.Utils
             bool endOfNumber = false;
             do
             {
-                if (fstream.Position == 0) // достигнуто начало файла
+                if (fileStream.Position == 0) // достигнуто начало файла
                 {
                     endOfNumber = true;
                 }
                 else
                 {
                     // Перемещаемся на предыдущий символ и считываем его.
-                    fstream.Seek(-1, SeekOrigin.Current);
-                    byte symbol = (byte)fstream.ReadByte();
+                    fileStream.Seek(-1, SeekOrigin.Current);
+                    byte symbol = (byte)fileStream.ReadByte();
                     if (symbol.IsMinus())
                     {
                         if (positionFromEnd > 0)
@@ -135,12 +126,51 @@ namespace FileSorting.Utils
                     }
 
                     // Устанавливаем позицию перед только что прочитанным символом.
-                    fstream.Seek(-1, SeekOrigin.Current);
+                    fileStream.Seek(-1, SeekOrigin.Current);
                 }
             }
             while (!endOfNumber);
 
             return positionFromEnd > 0; // в числе есть хотя бы одна цифра
+        }
+
+        public static void WriteNumbersToFile(string path, List<int> numbers)
+        {
+            using (FileStream fileStream = new FileStream(path, FileMode.Create))
+            {
+                for (int i = 0; i < numbers.Count; i++)
+                {
+                    fileStream.WriteNumber(numbers[i]);
+                    if (i < numbers.Count - 1)
+                    {
+                        fileStream.WriteWhitespace();
+                    }
+                }
+            }
+        }
+
+        public static void WriteNumber(this FileStream fileStream, int number)
+        {
+            fileStream.Write(Encoding.UTF8.GetBytes(number.ToString()));
+        }
+
+        public static void WriteWhitespace(this FileStream fileStream)
+        {
+            fileStream.Write(Encoding.UTF8.GetBytes(" "));
+        }
+
+        static public FileStream Switch(this FileStream thisStream, FileStream firstStream,
+            FileStream secondStream)
+        {
+            return thisStream.Name == secondStream.Name
+                                ? firstStream
+                                : secondStream;
+        }
+
+        public static string GetAppDirectory()
+        {
+            string appPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            return System.IO.Path.GetDirectoryName(appPath) ?? "";
         }
     }
 }
