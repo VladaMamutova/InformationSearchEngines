@@ -167,6 +167,23 @@ namespace FileSorting.Utils
                                 : secondStream;
         }
 
+        public static string GuaranteedMoveTo(this FileInfo sourceFile, string destinationPath)
+        {
+            if (!sourceFile.Exists)
+            {
+                return "";
+            }
+            
+            FileInfo destinationFile = new FileInfo(destinationPath);
+            if (destinationFile.Exists)
+            {
+                destinationFile.Delete();
+            }
+            
+            sourceFile.MoveTo(destinationPath);
+            return destinationPath;
+        }
+
         public static string GetAppDirectory()
         {
             string appPath = System.Reflection.Assembly.GetExecutingAssembly().Location;

@@ -7,16 +7,19 @@ namespace FileSorting.Logic
     public static class BalancedMerging
     {
         const int DEFAULT_NUMBERS_PER_SUBFILE = 1;
+        const int DEVICE_NUMBER = 4;
         const string RESULT_DIRECTORY = "balanced_merging";
+        const string SUBFILE_EXTENSION = ".txt";
 
         static readonly string ResultPath;
-        static readonly DeviceList Devices;
+
+        static readonly DeviceBar Devices;
 
         static BalancedMerging()
         {
             ResultPath = Path.Combine(GetAppDirectory(), RESULT_DIRECTORY);
-            Devices = new DeviceList(new string[] { "A", "B", "C", "D" }, ResultPath, 2);
-
+            Devices = DeviceBar.Generate(DEVICE_NUMBER, ResultPath);
+            Devices.DefineInOutDevices(2, 2);
             Devices.Prepare();
         }
 
@@ -36,12 +39,13 @@ namespace FileSorting.Logic
                     mergedSubfileIndex++;
                 }
 
-                Devices.ActivateNextDevices();
+                Devices.ShiftForward();
+
                 subfilesNumber = mergedSubfileIndex;
                 merged = subfilesNumber == 1;
                 if (merged)
                 {
-                    string resultPath = Path.Combine(GetAppDirectory(), RESULT_DIRECTORY + ".txt");
+                    string resultPath = Path.Combine(GetAppDirectory(), RESULT_DIRECTORY + SUBFILE_EXTENSION);
                     FileInfo resultFile = new FileInfo(resultPath);
                     if (resultFile.Exists)
                     {
@@ -51,8 +55,8 @@ namespace FileSorting.Logic
                     mergedFile.CopyTo(resultPath);
                 }
             }
-            
-            // ReleaseResources();
+
+            ReleaseResources();
         }
 
         private static int SplitAndSortBySubfiles(string fileName, int numbersPerSubfile)
@@ -67,8 +71,7 @@ namespace FileSorting.Logic
                     if (numbers.Count > 0)
                     {
                         numbers.QuickSort();
-
-                        string path = Devices.GenerateSubfilePath(subfileIndex);
+                        string path = GenerateInSubfilePath(subfileIndex);
                         WriteNumbersToFile(path, numbers);
 
                         subfileIndex++;
@@ -80,30 +83,50 @@ namespace FileSorting.Logic
             return subfileIndex;
         }
 
-        private static string MergeSubfiles(int mergedSubfileIndex)
+        private static string MergeSubfiles(int index)
         {
-            string firstPath = Devices.GenerateSubfilePath(mergedSubfileIndex * 2);
-            string secondPath = Devices.GenerateSubfilePath(mergedSubfileIndex * 2 + 1);
-            string mergedPath = Devices.GenerateSubfilePath(mergedSubfileIndex, true);
+            var firstDevice = Devices.GetInDevice(index);
+            string firstPath = GenerateSubfilePath(firstDevice, index);
+            var secondDevice = Devices.GetInDevice(index + 1);
+            string secondPath = GenerateSubfilePath(secondDevice, index);
 
+            string mergedPath = GenerateOutSubfilePath(index);
+
+            FileInfo firstFile = new FileInfo(firstPath);
             FileInfo secondFile = new FileInfo(secondPath);
-            if (!secondFile.Exists)
+
+            if (!firstFile.Exists)
             {
-                FileInfo mergedFile = new FileInfo(mergedPath);
-                if (mergedFile.Exists)
-                {
-                    mergedFile.Delete();
-                }
-                FileInfo firstFile = new FileInfo(firstPath);
-                firstFile.MoveTo(mergedPath);
-                return mergedPath;
+                return secondFile.GuaranteedMoveTo(mergedPath);
             }
 
-            MergeTwoFiles(firstPath, secondPath, mergedPath);
-            return mergedPath;
+            if (!secondFile.Exists)
+            {
+                return firstFile.GuaranteedMoveTo(mergedPath);
+            }
+
+            return MergeTwoFiles(firstPath, secondPath, mergedPath);
         }
 
-        private static void MergeTwoFiles(string firstPath, string secondPath, string mergedPath)
+        private static string GenerateInSubfilePath(int subfileIndex)
+        {
+            var device = Devices.GetInDevice(subfileIndex);
+            return GenerateSubfilePath(device, subfileIndex / Devices.InNumber);
+        }
+
+        private static string GenerateOutSubfilePath(int subfileIndex)
+        {
+            var device = Devices.GetOutDevice(subfileIndex);
+            return GenerateSubfilePath(device, subfileIndex / Devices.OutNumber);
+        }
+
+        private static string GenerateSubfilePath(Device device, int subfileIndex)
+        {
+            string subfileName = device.Name.ToLower() + (subfileIndex + 1);
+            return device.GetFullPath(subfileName + SUBFILE_EXTENSION);
+        }
+
+        private static string MergeTwoFiles(string firstPath, string secondPath, string mergedPath)
         {
             FileStream firstStream = new FileStream(firstPath, FileMode.Open);
             FileStream secondStream = new FileStream(secondPath, FileMode.Open);
@@ -151,7 +174,12 @@ namespace FileSorting.Logic
                 firstStream.Dispose();
                 secondStream.Dispose();
                 mergedStream.Dispose();
+
+                new FileInfo(firstPath).Delete();
+                new FileInfo(secondPath).Delete();
             }
+
+            return mergedPath;
         }
 
         static public void ReleaseResources()
