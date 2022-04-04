@@ -6,9 +6,15 @@ namespace FileSorting
     {
         public static void Main(string[] args)
         {
+            string sourcePath = GetFileName(args);
+            string destinationPath = "";            
             try
             {
-                BalancedMerging.Sort(GetFileName(args));
+                destinationPath = new BalancedMerging().Sort(sourcePath, 2);
+                Console.WriteLine($"The result of Balanced Merging is saved to \"{destinationPath}\"");
+
+                destinationPath = new PolyphaseSorting().Sort(sourcePath, 2);
+                Console.WriteLine($"The result of Polyphase Sorting is saved to \"{destinationPath}\"");
             }
             catch (Exception exception)
             {

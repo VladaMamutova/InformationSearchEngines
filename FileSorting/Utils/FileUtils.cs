@@ -167,6 +167,14 @@ namespace FileSorting.Utils
                                 : secondStream;
         }
 
+        public static void CreateFile(string path, string content)
+        {
+            using (FileStream fileStream = new FileStream(path, FileMode.Create))
+            {
+                fileStream.Write(Encoding.UTF8.GetBytes(content));
+            }
+        }
+
         public static string GuaranteedMoveTo(this FileInfo sourceFile, string destinationPath)
         {
             if (!sourceFile.Exists)
