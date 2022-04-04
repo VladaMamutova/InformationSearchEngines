@@ -18,6 +18,11 @@ namespace FileSorting.Model
         public string DirectoryPath { get; }
 
         /// <summary>
+        /// Информация о директории устройства.
+        /// </summary>
+        public DirectoryInfo Directory => new DirectoryInfo(DirectoryPath);
+
+        /// <summary>
         /// Инициализирует новый объект запоминающего устройства,
         /// создаёт директорию устройства.
         /// </summary>
@@ -34,21 +39,20 @@ namespace FileSorting.Model
         /// </summary>
         public void Prepare()
         {
-            Directory.CreateDirectory(DirectoryPath);
+            Dispose();
+            System.IO.Directory.CreateDirectory(DirectoryPath);
         }
 
         /// <summary>
-        /// Освобождает устройство, удаляя файлы в его директории и директорию.
+        /// Освобождает устройство, удаляя все файлы и и подкаталоги в нём.
         /// </summary>
         public void Dispose()
         {
             DirectoryInfo directory = new DirectoryInfo(DirectoryPath);
-            foreach (FileInfo file in directory.EnumerateFiles())
+            if (directory.Exists)
             {
-                file.Delete();
+                directory.Delete(true);
             }
-
-            directory.Delete();
         }
 
         /// <summary>

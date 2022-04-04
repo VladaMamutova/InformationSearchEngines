@@ -9,7 +9,7 @@ namespace FileSorting.Model
         public int InNumber => inIndexes.Length;
         public int OutNumber => outIndexes.Length; 
         
-        private DeviceBar(string[] names, string path)
+        public DeviceBar(string[] names, string path)
         {
             devices = new List<Device>(names.Length);
             foreach(var name in names)
@@ -19,6 +19,8 @@ namespace FileSorting.Model
 
             inIndexes = new int[0];
             outIndexes = new int[0];
+
+            Prepare();
         }
 
         public void DefineInOutDevices(int inNumber, int outNumber)
@@ -99,16 +101,20 @@ namespace FileSorting.Model
 
         public static DeviceBar Generate(int size, string path)
         {
+            if (size < 0)
+            {
+                throw new ArgumentException("Invalid size. It must be greater than zero.");
+            }
+
             List<string> names = new List<string> { "A", "B", "C", "D", "E", 
                 "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q",
                 "R", "S", "T", "U", "V", "W", "X", "Y", "Z" };
 
             if (size > names.Count)
             {
-                throw new Exception("Failed to generate Device Bar " +
+                throw new ArgumentException("Failed to generate Device Bar " +
                     $"of {size} elements. Max device number is {names.Count}");
             }
-
 
             return new DeviceBar(names.GetRange(0, size).ToArray(), path);
         }
