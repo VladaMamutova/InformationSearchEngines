@@ -6,32 +6,30 @@ namespace FileSorting.Logic
 {
     public abstract class FileSorter
     {
-        const int NUMBERS_PER_SUBFILE = 10;
-        const string SUBFILE_EXTENSION = ".txt";
+        protected const int NUMBERS_PER_SUBFILE = 10;
+        protected const string SUBFILE_EXTENSION = ".txt";
 
         private string _rootDirectory;
-        private string _resultDirectory;
         private string _subfileExtension;
+        protected abstract string ResultDirectory { get; }
 
         protected DeviceBar Devices { get; }
 
         protected FileSorter(int deviceNumber,
                           string? rootDirectory = null,
-                          string resultDirectory = "result",
                           string subfileExtension = SUBFILE_EXTENSION
         )
         {
             _rootDirectory = rootDirectory ?? GetAppDirectory();
-            _resultDirectory = resultDirectory;
             _subfileExtension = subfileExtension;
             Devices = DeviceBar.Generate(deviceNumber, ResultDirectoryPath);
         }
 
         protected string ResultDirectoryPath =>
-            Path.Combine(_rootDirectory, _resultDirectory);
+            Path.Combine(_rootDirectory, ResultDirectory);
         protected string ResultFilePath =>
-            Path.Combine(_rootDirectory, _resultDirectory + SubfileExtension);
-        
+            Path.Combine(_rootDirectory, ResultDirectory + SubfileExtension);
+
         protected string SubfileExtension => _subfileExtension;
 
         protected void ReleaseResources()
@@ -41,15 +39,27 @@ namespace FileSorting.Logic
             resultDirectory.Delete(true);
         }
 
-        protected string GenerateInSubfilePath(int deviceIndex, int subfileIndex)
+        protected string GenerateInSubfilePath(int inDeviceIndex, int subfileIndex)
         {
-            var device = Devices.GetInDevice(deviceIndex);
+            var device = Devices.GetInDevice(inDeviceIndex);
             return GenerateSubfilePath(device, subfileIndex);
         }
 
-        protected string GenerateOutSubfilePath(int deviceIndex, int subfileIndex)
+        protected string[] GenerateInSubfilePaths(int subfileIndex)
         {
-            var device = Devices.GetOutDevice(deviceIndex);
+            string[] subfilePaths = new string[Devices.InNumber];
+            for (int i = 0; i < subfilePaths.Length; i++)
+            {
+                var device = Devices.GetInDevice(i);
+                subfilePaths[i] = GenerateSubfilePath(device, subfileIndex);
+            }
+
+            return subfilePaths;
+        }
+
+        protected string GenerateOutSubfilePath(int outDeviceIndex, int subfileIndex)
+        {
+            var device = Devices.GetOutDevice(outDeviceIndex);
             return GenerateSubfilePath(device, subfileIndex);
         }
 
@@ -58,131 +68,91 @@ namespace FileSorting.Logic
             string subfileName = device.Name.ToLower() + (subfileIndex + 1);
             return device.GetFullPath(subfileName + SUBFILE_EXTENSION);
         }
-        
-        protected virtual int SplitAndSort(string fileName, int numbersPerSubfile)
+
+        protected string[] SplitAndSort(string fileName, int numbersPerSubfile)
         {
-            int subfileCount = 0;
-            using (FileStream fstream = new FileStream(fileName, FileMode.Open))
+            string[] subfiles;
+            using (FileStream fileStream = new FileStream(fileName, FileMode.Open))
             {
-                List<int> numbers;
-                do
-                {
-                    numbers = fstream.ReadNextNumbers(numbersPerSubfile);
-                    if (numbers.Count > 0)
-                    {
-                        numbers.QuickSort();
-                        int index = subfileCount / Devices.InNumber;
-                        string path = GenerateInSubfilePath(subfileCount, index);
-                        WriteNumbersToFile(path, numbers);
-
-                     subfileCount++;
-                    }
-                }
-                while (numbers.Count == numbersPerSubfile);
+                subfiles = GenerateSubfiles(fileStream, numbersPerSubfile);
             }
-
-            return subfileCount;
+            return subfiles;
         }
 
-        protected string MergeAll(int subfileNumber)
+        protected string[] GenerateSubfiles(FileStream fileStream, int numbersPerSubfile)
         {
-            string mergedPath = "";
-            int needToMergeCount = subfileNumber;
+            if (numbersPerSubfile < 1)
+            {
+                return new string[0];
+            }
+
+            List<string> subfiles = new List<string>();
+            bool endOfFile = false;
             do
             {
-                var mergedPaths = PerformMerge(needToMergeCount);
-                Devices.ShiftForward();
-                mergedPath = mergedPaths[0];
-                needToMergeCount = mergedPaths.Length;
-            }
-            while(needToMergeCount != 1);
-
-            new FileInfo(mergedPath).GuaranteedMoveTo(ResultFilePath);
-            return mergedPath;
-        }
-
-        protected abstract string[] PerformMerge(int subfileNumber);
-
-        protected string MergeSubfiles(string firstPath, string secondPath, string mergedPath)
-        {
-            if (!File.Exists(firstPath) && !File.Exists(secondPath))
-            {
-                throw new FileNotFoundException($"Nothing to merge! " +
-                    "Files \"{firstPath}\" and \"{secondPath} don't exist!\"");
-            }
-
-            if (!File.Exists(firstPath))
-            {
-                File.Move(secondPath, mergedPath);
-                return mergedPath;
-            }
-
-            if (!File.Exists(secondPath))
-            {
-                File.Move(firstPath, mergedPath);
-                return mergedPath;
-            }
-
-            FileStream firstStream = new FileStream(firstPath, FileMode.Open);
-            FileStream secondStream = new FileStream(secondPath, FileMode.Open);
-            FileStream mergedStream = new FileStream(mergedPath, FileMode.Create);
-
-            try
-            {
-                int number;
-                firstStream.TryReadNextNumber(out number);
-                FileStream stream = secondStream;
-
-                int endOfFile = 0;
-                while (endOfFile < 2)
+                var numbers = fileStream.ReadNumbers(numbersPerSubfile);
+                if (numbers.Count > 0)
                 {
-                    bool numberRead = stream.TryReadNextNumber(out int nextNumber);
-                    if (!numberRead)
-                    {
-                        endOfFile++;
-                        if (endOfFile == 2)
-                        {
-                            mergedStream.WriteNumber(number);
-                        }
-                        else
-                        {
-                            stream = stream.Switch(firstStream, secondStream);
-                        }
-                    }
-                    else
-                    {
-                        mergedStream.WriteNumber(Math.Min(number, nextNumber));
-                        mergedStream.WriteWhitespace();
-                        if (nextNumber > number)
-                        {
-                            number = nextNumber;
-                            if (endOfFile == 0)
-                            {
-                                stream = stream.Switch(firstStream, secondStream);
-                            }
-                        }
-                    }
+                    numbers.QuickSort();
+                    int index = subfiles.Count / Devices.InNumber;
+                    string path = GenerateInSubfilePath(subfiles.Count, index);
+                    WriteNumbersToFile(path, numbers);
+
+                    subfiles.Add(path);
                 }
+                endOfFile = numbers.Count < numbersPerSubfile;
             }
-            finally
-            {
-                firstStream.Dispose();
-                secondStream.Dispose();
-                mergedStream.Dispose();
+            while (!endOfFile);
 
-                new FileInfo(firstPath).Delete();
-                new FileInfo(secondPath).Delete();
-            }
-
-            return mergedPath;
+            return subfiles.ToArray();
         }
 
-        public string Sort(string fileName, int numbersPerSubfile = NUMBERS_PER_SUBFILE)
+        protected string[] GenerateSubfiles(FileStream fileStream,
+            int numbersPerSubfile, string[] subfilePaths)
         {
-            int subfileNumber = SplitAndSort(fileName, numbersPerSubfile);
-            MergeAll(subfileNumber);
-            ReleaseResources();
-            return ResultFilePath;
+            int subfileCount = 0;
+            int maxSubfileNumber = subfilePaths.Length;
+
+            bool endOfFile = false;
+            while (!endOfFile && subfileCount < maxSubfileNumber)
+            {
+                var numbers = fileStream.ReadNumbers(numbersPerSubfile);
+                if (numbers.Count > 0)
+                {
+                    numbers.QuickSort();
+                    WriteNumbersToFile(subfilePaths[subfileCount], numbers);
+                    subfileCount++;
+                }
+
+                endOfFile = numbers.Count < numbersPerSubfile;
+            }
+
+            return subfilePaths.SkipLast(maxSubfileNumber - subfileCount).ToArray();
         }
+
+        protected void MergeSubfiles(List<string> subfilePaths, string mergedPath)
+        {
+            var paths = GetExistingPaths(subfilePaths);
+            if (paths.Count < 1)
+            {
+                return;
+            }
+
+            var streams = paths.Select(path =>
+                new FileStream(path, FileMode.Open)).ToList();
+            var mergedStream = new FileStream(mergedPath, FileMode.Create);
+
+            while (TryReadMinNumberFromStreams(streams, out int number))
+            {
+                mergedStream.WriteNumber(number);
+                mergedStream.WriteWhitespace();
+            }
+
+            mergedStream.Close();
+            streams.ForEach(stream => stream.Close());
+            paths.ForEach(path => File.Delete(path));
+        }
+
+        public abstract string Sort(string fileName, int numbersPerSubfile = NUMBERS_PER_SUBFILE);
     }
 }

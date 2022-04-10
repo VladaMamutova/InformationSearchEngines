@@ -1,15 +1,19 @@
 using System.Text;
+using static System.IO.Path;
+using static System.Reflection.Assembly;
+
 namespace FileSorting.Utils
 {
     public static class FileUtils
     {
         /// <summary>
-        /// Считывает <c>n</c> первых чисел из файла.
+        /// Считывает следующие <c>n</c> чисел из файлового потока.
         /// </summary>
-        /// <param name="path">Путь к файлу.</param>
+        /// <param name="fileStream">Файловый поток.</param>
         /// <param name="n">Количество чисел.</param>
-        /// <returns>Список из n чисел, считанных с начала файла.</returns>
-        public static List<int> ReadNextNumbers(this FileStream fileStream, int n)
+        /// <returns>Список из следующих n чисел, считанных с текущей позиции 
+        /// файлового потока.</returns>
+        public static List<int> ReadNumbers(this FileStream fileStream, int n)
         {
             List<int> numbers = new List<int>(n);
             while (numbers.Count < n &&
@@ -20,6 +24,16 @@ namespace FileSorting.Utils
 
             return numbers;
         }
+
+        /// <summary>
+        /// Считывает следующее найденное число из файлового потока.
+        /// </summary>
+        /// <param name="fileStream">Файловый поток.</param>
+        /// <param name="number">Число, необходимое для инициализации.
+        /// Если операция считывания числа из файлового потока завершилась успешно,
+        /// то <c>number</c> будет равно этому числу, иначе будет равно 0.</param>
+        /// <returns>Возвращает true, если операция считывания числа из файла
+        /// завершилась успешно, false - иначе.</returns>
         public static bool TryReadNextNumber(this FileStream fileStream, out int number)
         {
             number = 0;
@@ -67,27 +81,18 @@ namespace FileSorting.Utils
         }
 
         /// <summary>
-        /// Считывает <c>n</c> последних чисел из файла.
+        /// Считывает предыдующие <c>n</c> чисел из файлового потока.
         /// </summary>
-        /// <param name="path">Путь к файлу.</param>
+        /// <param name="fileStream">Файловый поток.</param>
         /// <param name="n">Количество чисел.</param>
-        /// <returns>Список из n чисел, считанных с конца файла.</returns>
-        public static List<int> ReadLastNumbersFromFile(string path, int n)
+        /// <returns>Список из n предыдующих чисел, считанных с текущей позиции файлового потока.</returns>
+        public static List<int> ReadPreviousNumbers(this FileStream fileStream, int n)
         {
-            if (n <= 0)
-            {
-                return new List<int>();
-            }
-
             List<int> numbers = new List<int>(n);
-            using (FileStream fileStream = new FileStream(path, FileMode.Open))
+            while (numbers.Count < n &&
+                fileStream.TryReadPreviousNumber(out int number))
             {
-                fileStream.Seek(0, SeekOrigin.End);
-                while (numbers.Count < n &&
-                      fileStream.TryReadPreviousNumber(out int number))
-                {
-                    numbers.Add(number);
-                }
+                numbers.Add(number);
             }
 
             return numbers;
@@ -134,17 +139,28 @@ namespace FileSorting.Utils
             return positionFromEnd > 0; // в числе есть хотя бы одна цифра
         }
 
+        
+        public static List<string> GetExistingPaths(List<string> paths)
+        {
+            return paths.FindAll(path => File.Exists(path));
+        }
+
         public static void WriteNumbersToFile(string path, List<int> numbers)
         {
             using (FileStream fileStream = new FileStream(path, FileMode.Create))
             {
-                for (int i = 0; i < numbers.Count; i++)
+                fileStream.WriteNumbers(numbers);
+            }
+        }
+
+        public static void WriteNumbers(this FileStream fileStream, List<int> numbers)
+        {
+            for (int i = 0; i < numbers.Count; i++)
+            {
+                fileStream.WriteNumber(numbers[i]);
+                if (i < numbers.Count - 1)
                 {
-                    fileStream.WriteNumber(numbers[i]);
-                    if (i < numbers.Count - 1)
-                    {
-                        fileStream.WriteWhitespace();
-                    }
+                    fileStream.WriteWhitespace();
                 }
             }
         }
@@ -159,14 +175,6 @@ namespace FileSorting.Utils
             fileStream.Write(Encoding.UTF8.GetBytes(" "));
         }
 
-        static public FileStream Switch(this FileStream thisStream, FileStream firstStream,
-            FileStream secondStream)
-        {
-            return thisStream.Name == secondStream.Name
-                                ? firstStream
-                                : secondStream;
-        }
-
         public static void CreateFile(string path, string content)
         {
             using (FileStream fileStream = new FileStream(path, FileMode.Create))
@@ -175,27 +183,30 @@ namespace FileSorting.Utils
             }
         }
 
-        public static string GuaranteedMoveTo(this FileInfo sourceFile, string destinationPath)
+        public static string GuaranteedMoveTo(string sourcePath, string destinationPath)
         {
-            if (!sourceFile.Exists)
+            if (!File.Exists(sourcePath))
             {
                 return "";
             }
-            
-            FileInfo destinationFile = new FileInfo(destinationPath);
-            if (destinationFile.Exists)
+
+            if (File.Exists(destinationPath))
             {
-                destinationFile.Delete();
+                File.Delete(destinationPath);
             }
-            
-            sourceFile.MoveTo(destinationPath);
+
+            File.Move(sourcePath, destinationPath);
             return destinationPath;
         }
 
         public static string GetAppDirectory()
         {
-            string appPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-            return System.IO.Path.GetDirectoryName(appPath) ?? "";
+            return GetDirectoryName(GetExecutingAssembly().Location) ?? "";
+        }
+
+        public static string GetAppName()
+        {
+            return GetExecutingAssembly().GetName().Name ?? "";
         }
     }
 }

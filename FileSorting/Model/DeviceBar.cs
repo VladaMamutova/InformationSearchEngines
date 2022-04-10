@@ -1,6 +1,6 @@
 namespace FileSorting.Model
 {
-    public class DeviceBar : IShifting
+    public class DeviceBar
     {
         private List<Device> devices;
         private int[] inIndexes;
@@ -54,14 +54,14 @@ namespace FileSorting.Model
             devices.ForEach(device => device.Dispose());
         }
 
-        public Device GetInDevice(int index)
+        public Device GetInDevice(int inIndex)
         {
-            return GetDevice(inIndexes[index % inIndexes.Length]);
+            return GetDevice(inIndexes[inIndex % inIndexes.Length]);
         }
 
-        public Device GetOutDevice(int index)
+        public Device GetOutDevice(int outIndex)
         {
-            return GetDevice(outIndexes[index % outIndexes.Length]);
+            return GetDevice(outIndexes[outIndex % outIndexes.Length]);
         }
 
         public Device GetDevice(int index)
@@ -92,11 +92,6 @@ namespace FileSorting.Model
             {
                 outIndexes[i] = (nextOutIndex + i) % devices.Count;
             }
-        }
-
-        public void ShiftBackwards()
-        {
-            throw new NotImplementedException();
         }
 
         public static DeviceBar Generate(int size, string path)

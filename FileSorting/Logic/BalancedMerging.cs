@@ -1,32 +1,45 @@
+using static FileSorting.Utils.FileUtils;
 namespace FileSorting.Logic
 {
     public class BalancedMerging : FileSorter
     {
         const int DEVICE_NUMBER = 4;
-        const string RESULT_DIRECTORY = "balanced_merging";
+        protected override string ResultDirectory => "balanced_merging";
 
-        public BalancedMerging() : base(DEVICE_NUMBER, resultDirectory: RESULT_DIRECTORY)
+        public BalancedMerging() : base(DEVICE_NUMBER) {}
+
+        private string Merge(string[] subfilesPaths)
         {
-            Devices.DefineInOutDevices(2, 2);
+            string mergedPath = "";
+            for (int i = 0; i < subfilesPaths.Length; i += 2)
+            {
+                var paths = new List<string>();
+                paths.Add(subfilesPaths[i]);
+                if (i + 1 < subfilesPaths.Length)
+                {
+                    paths.Add(subfilesPaths[i + 1]);
+                }
+
+                mergedPath = GenerateOutSubfilePath(i, i / Devices.OutNumber);
+                MergeSubfiles(paths, mergedPath);
+
+                Devices.ShiftForward();
+            }
+
+            return mergedPath;
         }
 
-        protected override string[] PerformMerge(int subfileNumber)
+        public override string Sort(string fileName, int numbersPerSubfile = NUMBERS_PER_SUBFILE)
         {
-            List<string> mergedPaths = new List<string>();
-            int mergedCount = 0;
-            do
-            {
-                string firstPath = GenerateInSubfilePath(mergedCount, mergedCount);
-                string secondPath = GenerateInSubfilePath(mergedCount + 1, mergedCount);
-                int mergedSubfileIndex = mergedCount / Devices.OutNumber;
-                string mergedPath = GenerateOutSubfilePath(mergedCount, mergedSubfileIndex);
-                MergeSubfiles(firstPath, secondPath, mergedPath);
+            Devices.DefineInOutDevices(2, 2);
 
-                mergedPaths.Add(mergedPath);
-                mergedCount++;
-            } while (mergedCount * 2 < subfileNumber);
+            string[] subfilePaths = SplitAndSort(fileName, numbersPerSubfile);
 
-            return mergedPaths.ToArray();
+            string mergedPath = Merge(subfilePaths);
+            GuaranteedMoveTo(mergedPath, ResultFilePath);
+
+            ReleaseResources();
+            return ResultFilePath;
         }
     }
 }

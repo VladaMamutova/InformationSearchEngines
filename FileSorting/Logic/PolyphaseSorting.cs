@@ -6,69 +6,29 @@ namespace FileSorting.Logic
 {
     public class PolyphaseSorting : FileSorter
     {
-        const int PLACEHOLDER_NUMBER = 0;
+        const int PLACEHOLDER = 0;
         const int DEVICE_NUMBER = 3;
-        const string RESULT_DIRECTORY = "polyphase_sorting";
+
+        protected override string ResultDirectory => "polyphase_sorting";
 
         private int _placeholderNumber = 0;
 
-        public PolyphaseSorting() : base(DEVICE_NUMBER, resultDirectory: RESULT_DIRECTORY) { }
+        public PolyphaseSorting() : base(DEVICE_NUMBER) { }       
 
-        protected override int SplitAndSort(string fileName, int numbersPerSubfile)
+        private void RedistributeSubfiles(string[] subfiles) 
         {
-            Devices.DefineInOutDevices(1, 0);
-            int subfileNumber = base.SplitAndSort(fileName, numbersPerSubfile);
-            Devices.DefineInOutDevices(2, 1);
-            RedistributeSubfiles(subfileNumber);
-            return subfileNumber;
-        }
-
-        protected override string[] PerformMerge(int subfileNumber)
-        {
-            List<string> mergedPathes = new List<string>();
-            int mergedCount = 0;
-            bool merged;
-            do
-            {
-                merged = false;
-                string firstPath = GenerateInSubfilePath(mergedCount, mergedCount);
-                string secondPath = GenerateInSubfilePath(mergedCount + 1, mergedCount);
-                if (File.Exists(firstPath) && File.Exists(secondPath))
-                {
-                    string mergedPath = GenerateOutSubfilePath(mergedCount, mergedCount);
-                    MergeSubfiles(firstPath, secondPath, mergedPath);
-                    merged = true;
-
-                    mergedPathes.Add(mergedPath);
-                    mergedCount++;
-                }
-            } while(merged);
-
-            var nonMergedFiles = ArrangeSubfileNames(Devices.GetInDevice(0));
-            mergedPathes.AddRange(nonMergedFiles);
-
-            if (mergedPathes.Count == 1)
-            {
-                RemovePlaceholders(mergedPathes[0]);
-            }
-
-            return mergedPathes.ToArray();
-        }
-
-        private void RedistributeSubfiles(int subfilesNumber) 
-        {
-            if (subfilesNumber < 2)
+            if (subfiles.Length < 2)
             {
                 return;
             }
 
-            List<int> fibonacciNumbers = Find3NearestFibonacciNumbers(subfilesNumber);
+            List<int> fibonacciNumbers = Find3NearestFibonacciNumbers(subfiles.Length);
             int resultSubfilesNumber = fibonacciNumbers[2];
             int secondDeviceSubfilesNumber = fibonacciNumbers[0];
             
             var firstDevice = Devices.GetInDevice(0);
-            _placeholderNumber = resultSubfilesNumber - subfilesNumber;
-            CreateSubfiles(firstDevice, _placeholderNumber, PLACEHOLDER_NUMBER.ToString());
+            _placeholderNumber = resultSubfilesNumber - subfiles.Length;
+            CreateSubfiles(firstDevice, _placeholderNumber, PLACEHOLDER.ToString());
 
             var secondDevice = Devices.GetInDevice(1);
             MoveSubfiles(secondDeviceSubfilesNumber, firstDevice, secondDevice);
@@ -108,57 +68,19 @@ namespace FileSorting.Logic
             }
         }
 
-        public void RemovePlaceholders(string filePath)
+        private string[] MoveSubfiles(int subfileNumber, Device source, Device destination)
         {
-            if (_placeholderNumber == 0)
-            {
-                return;
-            }
+            string[] subfilesPaths = new string[subfileNumber];
 
-            int removedCount = 0;
-            const int numbersPerRead = 1;
-
-            string tempPath = Path.Combine(ResultDirectoryPath, "temp.txt");
-            FileStream tempFileStream = new FileStream(tempPath, FileMode.Create);
-            using (FileStream fileStream = new FileStream(filePath, FileMode.Open))
-            {
-                List<int>numbers;
-                do
-                {
-                    numbers = fileStream.ReadNextNumbers(numbersPerRead);
-                    if (numbers.Count > 0)
-                    {
-                        if (numbers[0] == PLACEHOLDER_NUMBER &&
-                            removedCount < _placeholderNumber)
-                        {
-                            removedCount++;
-                        }
-                        else
-                        {
-                            if (tempFileStream.Position > 0)
-                            {
-                                tempFileStream.WriteWhitespace();
-                            }
-                            tempFileStream.WriteNumber(numbers[0]);
-                        }
-                    }
-                }
-                while (numbers.Count == numbersPerRead);
-            }
-            tempFileStream.Close();
-
-            File.Delete(filePath);
-            File.Move(tempPath, filePath);
-        }
-
-        private void MoveSubfiles(int subfileNumber, Device source, Device destination)
-        {
             var files = source.Directory.GetFiles();
             var newSubfileIndex = destination.Directory.GetFiles().Length;
             for (int i = 0; i < subfileNumber && i < files.Length; i++)
             {
-                files[i].MoveTo(GenerateSubfilePath(destination, newSubfileIndex + i));
+                subfilesPaths[i] = GenerateSubfilePath(destination, newSubfileIndex + i);
+                files[i].MoveTo(subfilesPaths[i]);
             }
+
+            return subfilesPaths;
         }
 
         private string[] ArrangeSubfileNames(Device device)
@@ -202,52 +124,86 @@ namespace FileSorting.Logic
             return int.Parse(matchCollection[0].Value);
         }
 
-        // private int SplitAndSortBySubfiles(string fileName, int numbersPerSubfile)
-        // {
-        //     int subfileIndex = 0;
-        //     bool endOfFile = false;
-        //     using (FileStream fstream = new FileStream(fileName, FileMode.Open))
-        //     {
-        //         while (!endOfFile)
-        //         {
-        //             List<int> numbers = fstream.ReadNextNumbers(numbersPerSubfile);
-        //             if (numbers.Count > 0)
-        //             {
-        //                 numbers.QuickSort();
+        public void RemovePlaceholders(string filePath)
+        {
+            if (_placeholderNumber == 0)
+            {
+                return;
+            }
 
-        //                 string path = Devices.GenerateSubfilePath(subfileIndex);
-        //                 WriteNumbersToFile(path, numbers);
+            int removedCount = 0;
+            string tempPath = Path.Combine(ResultDirectoryPath, "temp.txt");
+            FileStream tempFileStream = new FileStream(tempPath, FileMode.Create);
+            using (FileStream fileStream = new FileStream(filePath, FileMode.Open))
+            {
+                while(fileStream.TryReadNextNumber(out int number))
+                {
+                    if (number == PLACEHOLDER &&
+                        removedCount < _placeholderNumber)
+                    {
+                        removedCount++;
+                    }
+                    else
+                    {
+                        if (tempFileStream.Position > 0)
+                        {
+                            tempFileStream.WriteWhitespace();
+                        }
+                        tempFileStream.WriteNumber(number);
+                    }
+                    
+                }
+            }
+            tempFileStream.Close();
 
-        //                 subfileIndex++;
-        //             }
-        //             endOfFile = numbers.Count < numbersPerSubfile;
-        //         }
-        //     }
+            File.Delete(filePath);
+            File.Move(tempPath, filePath);
+        }
 
-        //     return subfileIndex;
-        // }
+        private string Merge()
+        {
+            string mergedPath = GenerateInSubfilePath(0, 0);
+            bool merged;
+            do
+            {
+                int i = 0;
+                bool subfilesMerged;
+                do
+                {
+                    subfilesMerged = false;
+                    var inPaths = GenerateInSubfilePaths(i).ToList();
+                    if (GetExistingPaths(inPaths).Count == Devices.InNumber)
+                    {
+                        mergedPath = GenerateOutSubfilePath(i, i);
+                        MergeSubfiles(inPaths, mergedPath);
+                        subfilesMerged = true;
+                    }
+                    i++;
+                }
+                while(subfilesMerged);
 
-        // protected override string MergeSubfiles(int mergedSubfileIndex)
-        // {
-        //     string firstPath = Devices.GenerateSubfilePath(mergedSubfileIndex * 2);
-        //     string secondPath = Devices.GenerateSubfilePath(mergedSubfileIndex * 2 + 1);
-        //     string mergedPath = Devices.GenerateSubfilePath(mergedSubfileIndex, true);
+                var nonMergedFiles = ArrangeSubfileNames(Devices.GetInDevice(0));
+                merged = nonMergedFiles.Length == 0;
+                Devices.ShiftForward();
+            } while(!merged);
 
-        //     FileInfo secondFile = new FileInfo(secondPath);
-        //     if (!secondFile.Exists)
-        //     {
-        //         FileInfo mergedFile = new FileInfo(mergedPath);
-        //         if (mergedFile.Exists)
-        //         {
-        //             mergedFile.Delete();
-        //         }
-        //         FileInfo firstFile = new FileInfo(firstPath);
-        //         firstFile.MoveTo(mergedPath);
-        //         return mergedPath;
-        //     }
+            RemovePlaceholders(mergedPath);
+            return mergedPath;
+        }
 
-        //     MergeTwoFiles(firstPath, secondPath, mergedPath);
-        //     return mergedPath;
-        // }
+        public override string Sort(string fileName, int numbersPerSubfile = NUMBERS_PER_SUBFILE)
+        {
+            Devices.DefineInOutDevices(1, 0);
+            string[] subfilePaths = SplitAndSort(fileName, numbersPerSubfile);
+
+            Devices.DefineInOutDevices(2, 1);
+            RedistributeSubfiles(subfilePaths);
+
+            string mergedPath = Merge();
+            GuaranteedMoveTo(mergedPath, ResultFilePath);
+
+            ReleaseResources();
+            return ResultFilePath;
+        }
     }
 }

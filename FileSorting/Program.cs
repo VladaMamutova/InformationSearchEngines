@@ -1,19 +1,24 @@
-﻿using FileSorting.Logic;
+using FileSorting.Logic;
+using static FileSorting.Utils.FileUtils;
 
 namespace FileSorting
 {
     public class Program
     {
+        const string DEFAULT_SOURCE_FILE = "source.txt";
+        const int DEFAULT_NUMBERS_PER_FILE = 1;
+
         public static void Main(string[] args)
         {
-            string sourcePath = GetFileName(args);
-            string destinationPath = "";            
             try
             {
-                destinationPath = new BalancedMerging().Sort(sourcePath, 2);
+                GetArguments(args, out string sourcePath, out int numbersPerSubfile);
+                string destinationPath = "";
+
+                destinationPath = new BalancedMerging().Sort(sourcePath, numbersPerSubfile);
                 Console.WriteLine($"The result of Balanced Merging is saved to \"{destinationPath}\"");
 
-                destinationPath = new PolyphaseSorting().Sort(sourcePath, 2);
+                destinationPath = new PolyphaseSorting().Sort(sourcePath, numbersPerSubfile);
                 Console.WriteLine($"The result of Polyphase Sorting is saved to \"{destinationPath}\"");
             }
             catch (Exception exception)
@@ -22,24 +27,34 @@ namespace FileSorting
             }
         }
 
-        public static string GetFileName(string[] args)
+        public static void GetArguments(string[] args,
+            out string sourcePath, out int numbersPerSubfile)
         {
-            string fileName;
-            if (args.Length < 1)
+            if (args.Length == 2)
             {
-                string appName = System.Reflection.Assembly.GetExecutingAssembly().GetName().Name ?? "<app_name>";
-                throw new Exception("Wrong number of arguments!" +
-                    Environment.NewLine + $"Usage: ./{appName} <path/to/file>");
+                FileInfo file = new FileInfo(args[0]);
+                if (!file.Exists)
+                {
+                    throw new Exception($"Source file \"{file.FullName}\" not found!");
+                }
+                sourcePath = file.FullName;
+
+                if (!int.TryParse(args[1], out numbersPerSubfile) ||
+                    numbersPerSubfile < 1)
+                {
+                    throw new Exception($"The number of numbers per file must be more than one!");
+                }
+                return;
             }
 
-            fileName = args[0];
-            FileInfo file = new FileInfo(fileName);
-            if (!file.Exists)
-            {
-                throw new Exception($"File \"{fileName}\" not found!");
-            }
+            string sourceName = DEFAULT_SOURCE_FILE;
+            sourcePath = Path.Combine(GetAppDirectory(), sourceName);
+            numbersPerSubfile = DEFAULT_NUMBERS_PER_FILE;
 
-            return fileName;
+            string appNameArg = GetAppName() ?? "<app_name>";
+            Console.WriteLine($"Usage: ./{appNameArg} <path/to/source/file> <numbers_per_subfile>");
+            Console.Write("The program is started with default arguments: ");
+            Console.WriteLine($"{sourceName}, {numbersPerSubfile}.\n");
         }
     }
 }
