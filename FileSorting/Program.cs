@@ -1,4 +1,4 @@
-using FileSorting.Logic;
+﻿using FileSorting.Logic;
 using static FileSorting.Utils.FileUtils;
 
 namespace FileSorting
@@ -20,6 +20,9 @@ namespace FileSorting
 
                 destinationPath = new PolyphaseSorting().Sort(sourcePath, numbersPerSubfile);
                 Console.WriteLine($"The result of Polyphase Sorting is saved to \"{destinationPath}\"");
+
+                destinationPath = new OscillatedSorting().Sort(sourcePath, numbersPerSubfile);
+                Console.WriteLine($"The result of Oscillated Sorting is saved to \"{destinationPath}\"");
             }
             catch (Exception exception)
             {
