@@ -10,15 +10,21 @@ namespace SortingAlgorithmsComparison.Logic
             Result result = new Result();
             result.Timer.Start();
 
-            for (int i = 0; i < list.Count; ++i)
+            bool swap = true;
+            for (int i = 0; i < list.Count && swap; ++i)
             {
-                for (int j = 0; j < list.Count - i - 1; ++j)
+                ++result.ComparisonNumber;
+
+                swap = false;
+                for (int right = 0; right < list.Count - i - 1; ++right)
                 {
-                    if (list[j] > list[j + 1])
+                    if (list[right] > list[right + 1])
                     {
-                        var temp = list[j];
-                        list[j] = list[j + 1];
-                        list[j + 1] = temp;
+                        var temp = list[right];
+                        list[right] = list[right + 1];
+                        list[right + 1] = temp;
+
+                        swap = true;
 
                         ++result.PermutationNumber;
                     }
@@ -36,26 +42,30 @@ namespace SortingAlgorithmsComparison.Logic
             Result result = new Result();
             result.Timer.Start();
 
-            for (int i = 1; i < list.Count; ++i)
+            int minIndex;
+            for (int i = 0; i < list.Count - 1; ++i)
             {
-                int current = list[i];
-                int j = i;
-                while (j > 0 && list[j - 1] > current)
+                minIndex = i;
+                for (int j = i + 1; j < list.Count; ++j)
                 {
-                    list[j] = list[j - 1];
-                    --j;
+                    if (list[j] < list[minIndex])
+                    {
+                        minIndex = j;
+                    }
 
                     ++result.ComparisonNumber;
+                }
+
+                if (list[minIndex] != list[i])
+                {
+                    int temp = list[i];
+                    list[i] = list[minIndex];
+                    list[minIndex] = temp;
+
                     ++result.PermutationNumber;
                 }
 
                 ++result.ComparisonNumber;
-
-                if (j != i) {
-                    list[j] = current;
-
-                    ++result.PermutationNumber;
-                }
             }
 
             result.Timer.Stop();
@@ -68,11 +78,11 @@ namespace SortingAlgorithmsComparison.Logic
             {
                 return new Result();
             }
-            
+
             Stopwatch timer = new Stopwatch();
             timer.Start();
-            
-            var result = QuickSortFromLeftToRight(list, 0, list.Count -1);
+
+            var result = QuickSortFromLeftToRight(list, 0, list.Count - 1);
             timer.Stop();
             result.Timer = timer;
 
@@ -99,36 +109,41 @@ namespace SortingAlgorithmsComparison.Logic
         private static int Partition(List<int> list, int left, int right,
             ref Result result)
         {
-            int pivotIndex = (left + right) / 2; // опорный элемент - средний
-            int pivot = list[pivotIndex];
-
-            int temp = list[right];
-            list[right] = list[pivotIndex];
-            list[pivotIndex] = temp;
-            ++result.PermutationNumber;
-
-            var less = left;
-            for (int i = left; i < right; ++i)
+            int pivot = (left + right) / 2;
+            while (left < right)
             {
-                if (list[i] < pivot)
+                while (left < pivot && (list[left] <= list[pivot]))
                 {
-                    temp = list[i];
-                    list[i] = list[less];
-                    list[less] = temp;
-                    ++less;
+                    left++;
+                    ++result.ComparisonNumber;
+                }
+
+                while (right > pivot && (list[pivot] <= list[right]))
+                {
+                    right--;
+                    ++result.ComparisonNumber;
+                }
+                
+                if (left < right)
+                {
+                    int temp = list[left];
+                    list[left] = list[right];
+                    list[right] = temp;
+
+                    if (left == pivot)
+                    {
+                        pivot = right;
+                    }
+                    else if (right == pivot)
+                    {
+                        pivot = left;
+                    }
 
                     ++result.PermutationNumber;
                 }
-
-                ++result.ComparisonNumber;
             }
 
-            temp = list[right];
-            list[right] = list[less];
-            list[less] = temp;
-            ++result.PermutationNumber;
-
-            return less;
+            return pivot;
         }
     }
 }

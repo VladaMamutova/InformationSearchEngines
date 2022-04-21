@@ -24,8 +24,11 @@ namespace SortingAlgorithmsComparison.Logic
                 return source;
             }
 
-            Console.WriteLine($"Source array (n = {source.Count}):");
-            source.Print();
+            if (source.Count <= 1000)
+            {
+                Console.WriteLine($"Source array (n = {source.Count}):");
+                source.Print();
+            }
 
             PrintResultArray(list1, list2, list3);
 

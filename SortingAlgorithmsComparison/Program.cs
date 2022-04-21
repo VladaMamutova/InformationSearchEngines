@@ -38,7 +38,7 @@ namespace SortingAlgorithmsComparison
                 listSize = DEFAULT_ARRAY_SIZE;
             }
 
-            return new List<int>(GenerateValues(listSize));
+            return new List<int>(GenerateValues(listSize, 10_000));
         }
     }
 }

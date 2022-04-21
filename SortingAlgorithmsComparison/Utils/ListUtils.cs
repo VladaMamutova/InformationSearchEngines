@@ -2,15 +2,8 @@ namespace SortingAlgorithmsComparison.Utils
 {
     public static class ListUtils
     {
-        const int MAX_GENERATE_VALUE = 100;
-
-        public static int[] GenerateValues(int n, int maxValue = MAX_GENERATE_VALUE)
+        public static int[] GenerateValues(int n, int maxValue)
         {
-            if (maxValue == MAX_GENERATE_VALUE)
-            {
-                maxValue = Math.Max(maxValue, n * 2);
-            }
-
             int[] values = new int[n];
             var rand = new Random(0);
             for (int i = 0; i < n; i++)
