@@ -12,17 +12,20 @@ namespace FileSorting
         {
             try
             {
-                GetArguments(args, out string sourcePath, out int numbersPerSubfile);
-                string destinationPath = "";
+                GetArguments(args, out string sourcePath, out int numbersPerSubfile, out bool debug);
+                Metrics metrics;
 
-                destinationPath = new BalancedMerging().Sort(sourcePath, numbersPerSubfile);
-                Console.WriteLine($"The result of Balanced Merging is saved to \"{destinationPath}\"");
+                PrintSourceFile(sourcePath);
+                metrics = new BalancedMerging(debug).Sort(sourcePath, numbersPerSubfile);
+                PrintSortingResult("Balanced Merging", metrics);
 
-                destinationPath = new PolyphaseSorting().Sort(sourcePath, numbersPerSubfile);
-                Console.WriteLine($"The result of Polyphase Sorting is saved to \"{destinationPath}\"");
+                PrintSourceFile(sourcePath);
+                metrics = new PolyphaseSorting(debug).Sort(sourcePath, numbersPerSubfile);
+                PrintSortingResult("Polyphase Merging", metrics);
 
-                destinationPath = new OscillatedSorting().Sort(sourcePath, numbersPerSubfile);
-                Console.WriteLine($"The result of Oscillated Sorting is saved to \"{destinationPath}\"");
+                PrintSourceFile(sourcePath);
+                metrics = new OscillatedSorting(debug).Sort(sourcePath, numbersPerSubfile);
+                PrintSortingResult("Oscillated Sorting", metrics);
             }
             catch (Exception exception)
             {
@@ -30,10 +33,11 @@ namespace FileSorting
             }
         }
 
-        public static void GetArguments(string[] args,
-            out string sourcePath, out int numbersPerSubfile)
+        private static void GetArguments(string[] args,
+            out string sourcePath, out int numbersPerSubfile, out bool debug)
         {
-            if (args.Length == 2)
+            debug = false;
+            if (args.Length >= 2)
             {
                 FileInfo file = new FileInfo(args[0]);
                 if (!file.Exists)
@@ -47,17 +51,36 @@ namespace FileSorting
                 {
                     throw new Exception($"The number of numbers per file must be more than one!");
                 }
+
+                if (args.Length > 2 && args[2] == "debug")
+                {
+                    debug = true;
+                }
+
                 return;
             }
 
-            string sourceName = DEFAULT_SOURCE_FILE;
-            sourcePath = Path.Combine(GetAppDirectory(), sourceName);
+            sourcePath = Path.Combine(GetAppDirectory(), DEFAULT_SOURCE_FILE);
             numbersPerSubfile = DEFAULT_NUMBERS_PER_FILE;
 
             string appNameArg = GetAppName() ?? "<app_name>";
-            Console.WriteLine($"Usage: ./{appNameArg} <path/to/source/file> <numbers_per_subfile>");
-            Console.Write("The program is started with default arguments: ");
-            Console.WriteLine($"{sourceName}, {numbersPerSubfile}.\n");
+            Console.WriteLine($"Usage: ./{appNameArg} <path/to/source/file> <numbers_per_subfile> <debug>");
+            Console.WriteLine("* <debug> - is optional argument, type \"debug\" to display all the debug logs.");
+            Console.WriteLine("\nThe program is started with the default arguments: ");
+            Console.WriteLine($"{sourcePath}, {numbersPerSubfile}.\n");
+        }
+
+        private static void PrintSourceFile(string sourcePath)
+        {
+            Console.WriteLine("\nSource file:");
+            Console.WriteLine(File.ReadAllText(sourcePath));
+        }
+
+        private static void PrintSortingResult(string sortingName, Metrics metrics)
+        {
+            Console.WriteLine($"\nThe result of {sortingName}:");
+            Console.WriteLine(File.ReadAllText(metrics.DestinationPath));
+            Console.WriteLine(metrics + "\n");
         }
     }
 }

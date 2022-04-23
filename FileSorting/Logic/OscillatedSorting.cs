@@ -1,5 +1,4 @@
 using static FileSorting.Utils.FileUtils;
-using static FileSorting.Utils.Sorting;
 
 namespace FileSorting.Logic
 {
@@ -9,7 +8,8 @@ namespace FileSorting.Logic
 
         protected override string ResultDirectory => "oscillated_sorting";
 
-        public OscillatedSorting() : base(DEVICE_NUMBER) {}
+        public OscillatedSorting(bool debugMode = false)
+            : base(DEVICE_NUMBER, debugMode: debugMode) {}
 
         private string SplitAndMerge(string fileName, int numbersPerSubfile)
         {
@@ -32,8 +32,10 @@ namespace FileSorting.Logic
                     var inPaths = GenerateInSubfilePaths(0).ToList();
                     inPaths.Add(mergedPath);
                     string tempPath = Devices.GetOutDevice(0).GetFullPath("temp.txt");
+                    PrintDebugInfo("\nMerge Subfiles: \n");
                     MergeSubfiles(inPaths, tempPath);
                     File.Move(tempPath, mergedPath);
+                    PrintDebugFileMoveInfo(tempPath, mergedPath);
                     merged = endOfFile;
                 }
                 else if (!endOfFile)
@@ -43,6 +45,7 @@ namespace FileSorting.Logic
                     // которые затем сливаются в один подфайл на выходном устройстве.
                     var inPaths = GenerateSubfiles(fileStream, numbersPerSubfile,
                         GenerateInSubfilePaths(1)).ToList();
+                    PrintDebugInfo("\nMerge Subfiles: \n");
                     MergeSubfiles(inPaths, mergedPath);
                     endOfFile = inPaths.Count < Devices.InNumber;
                 }
@@ -56,15 +59,23 @@ namespace FileSorting.Logic
             return mergedPath;
         }
 
-        public override string Sort(string fileName, int numbersPerSubfile = NUMBERS_PER_SUBFILE)
+        public override Metrics Sort(string fileName, int numbersPerSubfile = NUMBERS_PER_SUBFILE)
         {
+            PrintDebugInfo("\n----- Oscillated Sorting -----\n");
+
+            Metrics.Start();
             Devices.DefineInOutDevices(3, 1);
 
             string mergedPath = SplitAndMerge(fileName, numbersPerSubfile);
             GuaranteedMoveTo(mergedPath, ResultFilePath);
 
             ReleaseResources();
-            return ResultFilePath;
+            Metrics.Stop(ResultFilePath);
+
+            PrintDebugInfo("\nMove result file:\n");
+            PrintDebugFileMoveInfo(mergedPath, ResultFilePath);
+
+            return Metrics;
         }
     }
 }

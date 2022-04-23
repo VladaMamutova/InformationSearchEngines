@@ -138,37 +138,6 @@ namespace FileSorting.Utils
 
             return positionFromEnd > 0; // в числе есть хотя бы одна цифра
         }
-
-        public static bool TryReadMinNumberFromStreams(List<FileStream> streams, out int number)
-        {
-            number = 0;
-            bool numberRead = false;
-            int minStream = 0;
-            long minStreamOffset = 0;
-            for (int i = 0; i < streams.Count; i++)
-            {
-                var position = streams[i].Position;
-                if (streams[i].TryReadNextNumber(out int currentNumber))
-                {
-                    var symbolsRead = streams[i].Position - position;
-                    if (!numberRead || currentNumber < number)
-                    {
-                        number = currentNumber;
-                        streams[minStream].Seek(-minStreamOffset, SeekOrigin.Current);
-                        numberRead = true;
-
-                        minStream = i;
-                        minStreamOffset = symbolsRead;
-                    }
-                    else
-                    {
-                        streams[i].Seek(-symbolsRead, SeekOrigin.Current);
-                    }
-                }
-            }
-
-            return numberRead;
-        }
         
         public static List<string> GetExistingPaths(List<string> paths)
         {
@@ -205,12 +174,10 @@ namespace FileSorting.Utils
             fileStream.Write(Encoding.UTF8.GetBytes(" "));
         }
 
-        public static void CreateFile(string path, string content)
+        public static void CreateFile(string path)
         {
-            using (FileStream fileStream = new FileStream(path, FileMode.Create))
-            {
-                fileStream.Write(Encoding.UTF8.GetBytes(content));
-            }
+            var stream = File.Create(path);
+            stream.Close();
         }
 
         public static string GuaranteedMoveTo(string sourcePath, string destinationPath)
